@@ -30,10 +30,12 @@ function holding the Anthropic API key so no one has to log into Claude.
 
 Each time a kid taps "get feedback," it's one Claude API call billed to
 whatever Anthropic account owns that API key (pay-as-you-go, a fraction
-of a cent per call with Sonnet at this length). There's no built-in cap —
-if you want a safety limit, ask Claude to add a simple daily-count check
-in `api/feedback.js` (same pattern as the 30-scan/month limit in
-receiptbox).
+of a cent per call with Sonnet at this length). There's a built-in cap:
+`DAILY_FEEDBACK_LIMIT` in `src/App.jsx` (default 5/day, tracked in the
+browser's localStorage — easy to bypass if a kid clears browser data,
+but plenty for normal family use). Change the number there if you want
+a different limit, or ask Claude to move the cap server-side into
+`api/feedback.js` if you need something harder to get around.
 
 ## Put it on the iPad
 

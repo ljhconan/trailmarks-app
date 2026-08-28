@@ -188,6 +188,31 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+const DAILY_FEEDBACK_LIMIT = 5;
+
+function getFeedbackUsageToday() {
+  try {
+    const raw = localStorage.getItem("trailmarks-feedback-usage");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.date === todayISO()) return parsed.count || 0;
+    }
+  } catch (e) {
+    // ignore — treat as no usage yet
+  }
+  return 0;
+}
+
+function recordFeedbackUsage() {
+  try {
+    const count = getFeedbackUsageToday() + 1;
+    localStorage.setItem("trailmarks-feedback-usage", JSON.stringify({ date: todayISO(), count }));
+    return count;
+  } catch (e) {
+    return null;
+  }
+}
+
 function computeStreak(dates) {
   if (!dates || dates.length === 0) return 0;
   const set = new Set(dates);
@@ -226,6 +251,8 @@ export default function TrailmarksJournal() {
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [feedbackError, setFeedbackError] = useState(false);
+  const [feedbackCapped, setFeedbackCapped] = useState(false);
+  const [feedbackUsage, setFeedbackUsage] = useState(0);
 
   // Load progress
   useEffect(() => {
@@ -241,6 +268,7 @@ export default function TrailmarksJournal() {
     } finally {
       setLoaded(true);
     }
+    setFeedbackUsage(getFeedbackUsageToday());
   }, []);
 
   const saveProgress = useCallback((nextStampCount, nextDates) => {
@@ -291,14 +319,22 @@ export default function TrailmarksJournal() {
 
     setFeedback(null);
     setFeedbackError(false);
-    setFeedbackLoading(true);
-    try {
-      const result = await fetchTrailGuideFeedback(writing);
-      setFeedback(result);
-    } catch (e) {
-      setFeedbackError(true);
-    } finally {
-      setFeedbackLoading(false);
+    setFeedbackCapped(false);
+
+    if (feedbackUsage >= DAILY_FEEDBACK_LIMIT) {
+      setFeedbackCapped(true);
+    } else {
+      setFeedbackLoading(true);
+      try {
+        const result = await fetchTrailGuideFeedback(writing);
+        setFeedback(result);
+        const newCount = recordFeedbackUsage();
+        if (newCount !== null) setFeedbackUsage(newCount);
+      } catch (e) {
+        setFeedbackError(true);
+      } finally {
+        setFeedbackLoading(false);
+      }
     }
 
     const today = todayISO();
@@ -318,6 +354,7 @@ export default function TrailmarksJournal() {
     setChecklist({});
     setFeedback(null);
     setFeedbackError(false);
+    setFeedbackCapped(false);
     rerollSpark();
   }
 
@@ -484,6 +521,9 @@ export default function TrailmarksJournal() {
                 feedbackLoading={feedbackLoading}
                 feedback={feedback}
                 feedbackError={feedbackError}
+                feedbackCapped={feedbackCapped}
+                feedbackUsage={feedbackUsage}
+                feedbackLimit={DAILY_FEEDBACK_LIMIT}
                 onWriteAnother={resetWritingSession}
               />
             )}
@@ -666,9 +706,12 @@ function WriteView({
   feedbackLoading,
   feedback,
   feedbackError,
+  feedbackCapped,
+  feedbackUsage,
+  feedbackLimit,
   onWriteAnother,
 }) {
-  const finished = !feedbackLoading && (feedback || feedbackError);
+  const finished = !feedbackLoading && (feedback || feedbackError || feedbackCapped);
   const starter = beginningStarter(spark);
 
   function useStarter() {
@@ -859,17 +902,27 @@ function WriteView({
               Fill in all three parts and check every box to get feedback and a stamp.
             </div>
           )}
+          {hasWritten && allChecked && !feedbackLoading && typeof feedbackUsage === "number" && (
+            <div style={{ fontSize: 12, color: "var(--ink)", opacity: 0.5, textAlign: "center", marginTop: 6 }}>
+              {Math.max(feedbackLimit - feedbackUsage, 0)} of {feedbackLimit} Trail Guide feedbacks left today
+            </div>
+          )}
         </>
       )}
 
-      {(feedback || feedbackError) && (
-        <FeedbackCard feedback={feedback} error={feedbackError} onWriteAnother={onWriteAnother} />
+      {(feedback || feedbackError || feedbackCapped) && (
+        <FeedbackCard
+          feedback={feedback}
+          error={feedbackError}
+          capped={feedbackCapped}
+          onWriteAnother={onWriteAnother}
+        />
       )}
     </div>
   );
 }
 
-function FeedbackCard({ feedback, error, onWriteAnother }) {
+function FeedbackCard({ feedback, error, capped, onWriteAnother }) {
   return (
     <div
       className="tm-card"
@@ -886,7 +939,15 @@ function FeedbackCard({ feedback, error, onWriteAnother }) {
         </div>
       </div>
 
-      {error ? (
+      {capped ? (
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 14 }}>
+          <Star size={18} color="var(--mustard)" style={{ flexShrink: 0, marginTop: 2 }} />
+          <span>
+            You've used up today's Trail Guide feedback — but your stamp is still earned! More feedback opens up
+            again tomorrow.
+          </span>
+        </div>
+      ) : error ? (
         <div style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 14 }}>
           <AlertTriangle size={18} color="var(--plum)" style={{ flexShrink: 0, marginTop: 2 }} />
           <span>
