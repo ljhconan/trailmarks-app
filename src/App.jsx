@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Footprints,
   Feather,
@@ -44,6 +44,12 @@ const STORY_CHARACTERS = [
   { emoji: "🤖", label: "a robot learning how to feel emotions" },
   { emoji: "🐢", label: "the slowest turtle in the whole town" },
   { emoji: "🦁", label: "a lion who is scared of mice" },
+  { emoji: "🐿️", label: "a squirrel who forgot where she hid her acorns" },
+  { emoji: "🦋", label: "a caterpillar dreaming about flying" },
+  { emoji: "🐺", label: "a wolf pup who got separated from the pack" },
+  { emoji: "🧜", label: "a mermaid who is curious about dry land" },
+  { emoji: "🐍", label: "a snake who is scared of the dark" },
+  { emoji: "🦉", label: "an owl who can't stay awake at night" },
 ];
 
 const STORY_SETTINGS = [
@@ -57,6 +63,12 @@ const STORY_SETTINGS = [
   { emoji: "🌊", label: "an underwater city made of bubbles" },
   { emoji: "🎪", label: "a circus that only opens at midnight" },
   { emoji: "🛒", label: "a grocery store where nothing stays on the shelves" },
+  { emoji: "🗻", label: "the very top of a snowy mountain" },
+  { emoji: "🏚️", label: "an old house nobody has lived in for years" },
+  { emoji: "🚉", label: "a train station where the trains never seem to leave" },
+  { emoji: "🏛️", label: "a museum after closing time" },
+  { emoji: "🛖", label: "a treehouse hidden deep in the jungle" },
+  { emoji: "📚", label: "a giant library with endless rows of shelves" },
 ];
 
 const STORY_PROBLEMS = [
@@ -70,22 +82,46 @@ const STORY_PROBLEMS = [
   { emoji: "✉️", label: "got a mysterious invitation with no name on it" },
   { emoji: "🌀", label: "got turned upside down by a strange wind" },
   { emoji: "🧩", label: "found a puzzle piece that didn't belong to any puzzle" },
+  { emoji: "🧭", label: "found a compass that doesn't point north" },
+  { emoji: "🫙", label: "found a jar that was always full no matter what" },
+  { emoji: "🖼️", label: "noticed a painting that changed every time they looked away" },
+  { emoji: "📻", label: "heard a radio playing a song nobody else could hear" },
+  { emoji: "🕰️", label: "found a clock that ran backwards" },
+  { emoji: "🪞", label: "found a mirror that showed a different reflection" },
 ];
 
-function randomIndex(len, excludeIndex) {
-  if (len <= 1) return 0;
-  let next = Math.floor(Math.random() * len);
-  if (excludeIndex !== undefined) {
-    while (next === excludeIndex) next = Math.floor(Math.random() * len);
+function shuffledIndices(len) {
+  const arr = Array.from({ length: len }, (_, i) => i);
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
   }
-  return next;
+  return arr;
 }
 
-function pickRandomSpark() {
+// A "shuffle bag" per category: draws go through every option once (in a
+// random order) before any repeat is possible, then reshuffles for the
+// next cycle — so quick, repeated re-rolling never feels repetitive.
+function makeSparkBags() {
   return {
-    characterIdx: randomIndex(STORY_CHARACTERS.length),
-    settingIdx: randomIndex(STORY_SETTINGS.length),
-    problemIdx: randomIndex(STORY_PROBLEMS.length),
+    character: shuffledIndices(STORY_CHARACTERS.length),
+    setting: shuffledIndices(STORY_SETTINGS.length),
+    problem: shuffledIndices(STORY_PROBLEMS.length),
+  };
+}
+
+function drawFromBag(bags, name, len) {
+  if (!bags[name] || bags[name].length === 0) {
+    bags[name] = shuffledIndices(len);
+  }
+  return bags[name].pop();
+}
+
+function pickRandomSpark(bags) {
+  return {
+    characterIdx: drawFromBag(bags, "character", STORY_CHARACTERS.length),
+    settingIdx: drawFromBag(bags, "setting", STORY_SETTINGS.length),
+    problemIdx: drawFromBag(bags, "problem", STORY_PROBLEMS.length),
   };
 }
 
@@ -241,7 +277,8 @@ export default function TrailmarksJournal() {
   const [completedDates, setCompletedDates] = useState([]);
   const [celebrate, setCelebrate] = useState(false);
 
-  const [spark, setSpark] = useState(() => pickRandomSpark());
+  const sparkBags = useRef(makeSparkBags());
+  const [spark, setSpark] = useState(() => pickRandomSpark(sparkBags.current));
   const [writing, setWriting] = useState({ beginning: "", middle: "", end: "" });
   const [checklist, setChecklist] = useState({});
 
@@ -302,14 +339,14 @@ export default function TrailmarksJournal() {
   }
 
   function rerollSpark() {
-    setSpark(pickRandomSpark());
+    setSpark(pickRandomSpark(sparkBags.current));
   }
 
   function rerollSparkPart(part) {
     setSpark((s) => {
-      if (part === "character") return { ...s, characterIdx: randomIndex(STORY_CHARACTERS.length, s.characterIdx) };
-      if (part === "setting") return { ...s, settingIdx: randomIndex(STORY_SETTINGS.length, s.settingIdx) };
-      if (part === "problem") return { ...s, problemIdx: randomIndex(STORY_PROBLEMS.length, s.problemIdx) };
+      if (part === "character") return { ...s, characterIdx: drawFromBag(sparkBags.current, "character", STORY_CHARACTERS.length) };
+      if (part === "setting") return { ...s, settingIdx: drawFromBag(sparkBags.current, "setting", STORY_SETTINGS.length) };
+      if (part === "problem") return { ...s, problemIdx: drawFromBag(sparkBags.current, "problem", STORY_PROBLEMS.length) };
       return s;
     });
   }
