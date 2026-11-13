@@ -225,7 +225,7 @@ export function todayWords(level, profile, dateISO) {
   let h = 0;
   for (const ch of profile + dateISO) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   const a = h % pool.length;
-  const b = (a + 1 + ((h >> 3) % (pool.length - 1))) % pool.length;
+  const b = (a + 1 + ((h >>> 3) % (pool.length - 1))) % pool.length;
   return [pool[a], pool[b]];
 }
 
