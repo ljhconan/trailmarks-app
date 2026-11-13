@@ -18,6 +18,7 @@ import {
   Lightbulb,
   Wand2,
 } from "lucide-react";
+import LevelQuest, { CollectedWords } from "./LevelQuest.jsx";
 
 const FONT_LINK_ID = "trailmarks-fonts";
 
@@ -224,7 +225,7 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-const DAILY_FEEDBACK_LIMIT = 5;
+const DAILY_FEEDBACK_LIMIT = 12; // Level Quest uses 2 calls per piece (draft + revision)
 
 function getFeedbackUsageToday() {
   try {
@@ -386,6 +387,17 @@ export default function TrailmarksJournal() {
     setTimeout(() => setCelebrate(false), 2600);
   }
 
+  function completeQuestPiece() {
+    const today = todayISO();
+    const nextDates = completedDates.includes(today) ? completedDates : [...completedDates, today].slice(-60);
+    const nextStamps = stampCount + 1;
+    setStampCount(nextStamps);
+    setCompletedDates(nextDates);
+    saveProgress(nextStamps, nextDates);
+    setCelebrate(true);
+    setTimeout(() => setCelebrate(false), 2600);
+  }
+
   function resetWritingSession() {
     setWriting({ beginning: "", middle: "", end: "" });
     setChecklist({});
@@ -494,6 +506,7 @@ export default function TrailmarksJournal() {
         >
           {[
             { key: "trail", label: "Trail Map", icon: MapPin },
+            { key: "quest", label: "Level Quest", icon: Wand2 },
             { key: "write", label: "Story Spark", icon: PenLine },
             { key: "sentence", label: "Sentence Builder", icon: Feather },
             { key: "words", label: "Word Bank", icon: BookOpen },
@@ -536,8 +549,17 @@ export default function TrailmarksJournal() {
                 stampCount={stampCount}
                 stonesFilled={stonesFilled}
                 streak={streak}
-                onStart={() => setActiveTab("write")}
+                onStart={() => setActiveTab("quest")}
                 saveError={saveError}
+              />
+            )}
+
+            {activeTab === "quest" && (
+              <LevelQuest
+                onComplete={completeQuestPiece}
+                getUsage={getFeedbackUsageToday}
+                recordUsage={() => { const n = recordFeedbackUsage(); if (n !== null) setFeedbackUsage(n); return n; }}
+                limit={DAILY_FEEDBACK_LIMIT}
               />
             )}
 
@@ -574,7 +596,12 @@ export default function TrailmarksJournal() {
               />
             )}
 
-            {activeTab === "words" && <WordBankView />}
+            {activeTab === "words" && (
+              <>
+                <WordBankView />
+                <CollectedWords />
+              </>
+            )}
           </>
         )}
       </div>
